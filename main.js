@@ -129,12 +129,20 @@ updateMessages = function(data, markFn) {
                     }
                 }
 
-            return {text: message.text, username: username};
+            return {
+                text: message.text, 
+                username: username,
+                ts: message.ts
+            };
         })
         .forEach(function(message) {
+            seconds = Number(message.ts.split(/\./)[0]) * 1000;
+            date = new Date(seconds);
+            dateString = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short', year: 'numeric' });
             // add messages to window
             components.chatWindow.unshiftLine(
-                '{bold}' + message.username + '{/bold}: ' + message.text
+                '{bold}{underline}' + message.username + '{/underline}{/bold}: ' + dateString + '\n' + 
+                '\t' + message.text
             );
         });
 
