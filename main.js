@@ -1,5 +1,6 @@
 var ui = require('./userInterface.js'),
     slack = require('./slackClient.js'),
+    blessed = require('blessed'),
     fs = require('fs'),
     components = ui.init(), // ui components
     users,
@@ -28,6 +29,7 @@ slack.init(function(data, ws) {
     //fs.appendFile('./ws_log.txt', '\n\n###############\n\n');
     ws.on('message', function(message, flags){
         message = JSON.parse(message);
+        console.log(JSON.stringify(message));
 
         if ('reply_to' in message) {
             handleSentConfirmation(message);
@@ -111,40 +113,42 @@ updateMessages = function(data, markFn) {
     components.chatWindow.deleteTop(); // remove loading message
 
     // filter and map the messages before displaying them
-    data.messages
-        .filter(function(item) {
-            return (item.type === 'message');
-        })
-        .map(function(message) {
-            var len = users.length,
-                username;
+    messages = data.messages;
+    messages.filter(function(item) {
+        return (item.type === 'message');
+    });
+    for(var i = 0; i < messages.length; i++) {
+        var message = messages[i],
+            prevMessage = messages[(i == messages.length-1) ? i : i+1],
+            username;
 
-            // get the author
-            if(message.user === currentUser.id) username = currentUser.name
-            else
-                for(var i=0; i < len; i++) {
-                    if (message.user === users[i].id) {
-                        username = users[i].name;
-                        break;
-                    }
+        // get the author
+        if(message.user === currentUser.id) {
+            username = currentUser.name;
+        } else {
+            for(var j = 0; j < users.length; j++) {
+                if (message.user === users[j].id) {
+                    username = users[j].name;
+                    break;
                 }
+            }
+        }
 
-            return {
-                text: message.text, 
-                username: username,
-                ts: message.ts
-            };
-        })
-        .forEach(function(message) {
-            seconds = Number(message.ts.split(/\./)[0]) * 1000;
-            date = new Date(seconds);
-            dateString = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short', year: 'numeric' });
-            // add messages to window
-            components.chatWindow.unshiftLine(
-                '{bold}{underline}' + message.username + '{/underline}{/bold}: ' + dateString + '\n' + 
-                '\t' + message.text
-            );
-        });
+        date = new Date(message.ts.split(/\./)[0] * 1000);
+        dateString = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short', year: 'numeric' });
+        prevDate = new Date(prevMessage.ts.split(/\./)[0] * 1000);
+        prevDateString = prevDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short', year: 'numeric' });
+
+        // add messages to window
+        components.chatWindow.unshiftLine(
+            '{bold}{underline}' + username + ': ' + dateString + '{/}\n' +
+            '\t' + message.text + '\n'
+        );
+
+        if(i == messages.length-1 || date.getDate() != prevDate.getDate() || date.getMonth() != prevDate.getMonth()) {
+            components.chatWindow.unshiftLine('{bold}-----------------------------  ' + dateString + '  -----------------------------{/}');
+        }
+    }
 
     // mark the most recently read message
     markFn(currentChannelId, data.messages[0].ts);
